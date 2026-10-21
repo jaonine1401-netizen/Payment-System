@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบจัดการยอดชำระเงิน</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #f4f5f7; margin: 0; padding: 20px; display: flex; justify-content: center; }
+    .container { background: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); max-width: 480px; width: 100%; }
+    h2 { text-align: center; color: #333; margin-top: 0; margin-bottom: 20px; }
+    
+    /* สไตล์ปุ่มสลับเมนู */
+    .tab-menu { display: flex; background: #e9ecef; border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; font-weight: bold; font-size: 15px; color: #6c757d; cursor: pointer; border-radius: 6px; transition: 0.2s; }
+    .tab-btn.active { background: #0056b3; color: white; }
+
+    /* ช่องทางชำระเงิน */
+    .payment-info { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; line-height: 1.6; color: #333; }
+    .payment-title { font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #111; }
+    .warning-text { color: #dc3545; font-weight: bold; font-size: 13px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #dc3545; }
+
+    /* ฟอร์มและอินพุต */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-weight: bold; margin-bottom: 6px; color: #333; font-size: 14px; }
+    input[type="text"], input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    input[type="file"] { display: block; margin-top: 4px; }
+    
+    .btn-submit { width: 100%; background-color: #28a745; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .btn-submit:hover { background-color: #218838; }
+    .btn-search { width: 100%; background-color: #0056b3; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .btn-search:hover { background-color: #004085; }
+
+    /* การ์ดสรุปผล */
+    .summary-card { background-color: #e9ecef; padding: 20px; border-radius: 8px; color: #333; margin-top: 15px; }
+    .summary-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; color: #111; text-align: center; }
+    .summary-item { margin-bottom: 10px; font-size: 15px; }
+    .summary-item strong { display: inline-block; width: 120px; }
+    .status-text { color: #28a745; font-weight: bold; margin-top: 15px; text-align: center; }
+    
+    /* ตารางประวัติ */
+    .history-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .history-table th, .history-table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    .history-table th { background-color: #ddd; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>ระบบจัดการยอดชำระเงิน</h2>
+
+    <!-- เมนูสลับหน้า -->
+    <div class="tab-menu">
+      <button class="tab-btn active" onclick="switchTab('sendTab')">📥 แจ้งส่งยอด</button>
+      <button class="tab-btn" onclick="switchTab('checkTab')">🔍 เช็คยอด</button>
+    </div>
+
+    <!-- ================= หน้าแจ้งส่งยอด ================= -->
+    <div id="sendTab">
+      <div id="sendFormContainer">
+        <div class="payment-info">
+          <div class="payment-title">💳 ข้อมูลการชำระเงิน</div>
+          <div><strong>ชื่อบัญชี:</strong> นางสาวกรองทอง สรวยงาม</div>
+          <div><strong>ธนาคาร:</strong> ไทยพาณิชย์</div>
+          <div><strong>เลขบัญชี:</strong> 8214141484</div>
+          <div style="margin-top: 4px;"><strong>TrueMoney Wallet:</strong> 0999671158</div>
+          
+          <div class="warning-text">
+            ⚠️ โอนตามนี้เท่านั้น หากโอนเข้าบัญชีนอกเหนือจากที่แจ้งไปขอไม่รับผิดชอบทุกกรณี!<br>
+            ⚠️ หากทำการโอนหรือชำระเงินเสร็จสิ้นแล้ว ขอสงวนการคืนเงินทุกกรณี!
+          </div>
+        </div>
+
+        <form id="submitForm">
+          <div class="form-group">
+            <label>รหัสประจำตัว (เช่น URD1234 หรือ ORD1234)</label>
+            <input type="text" id="orderId" placeholder="กรอกรหัสประจำตัวของคุณ" required>
+          </div>
+
+          <div class="form-group">
+            <label>ชื่อเล่น</label>
+            <input type="text" id="nickName" placeholder="เช่น นัท" required>
+          </div>
+
+          <div class="form-group">
+            <label>ยอดที่โอน (บาท)</label>
+            <input type="number" id="amount" placeholder="เช่น 500" required>
+          </div>
+
+          <div class="form-group">
+            <label>อัพโหลดสลิปการโอน (ถ้ามี)</label>
+            <input type="file" id="fileInput" accept="image/*">
+          </div>
+
+          <button type="button" class="btn-submit" onclick="submitData()">ยืนยันการส่งยอด</button>
+        </form>
+      </div>
+
+      <!-- สรุปรายการส่งยอด -->
+      <div id="sendSummaryContainer" style="display: none;">
+        <div class="summary-card">
+          <div class="summary-title">แจ้งส่งยอดสำเร็จ!</div>
+          <div class="summary-item"><strong>รหัสประจำตัว:</strong> <span id="resOrderId"></span></div>
+          <div class="summary-item"><strong>ชื่อเล่น:</strong> <span id="resNickName"></span></div>
+          <div class="summary-item"><strong>ยอดที่โอน:</strong> <span id="resAmount"></span> บาท</div>
+          <div class="status-text">สถานะ: บันทึกข้อมูลเรียบร้อย</div>
+          <button class="btn-submit" style="margin-top:15px; background:#6c757d;" onclick="resetSendForm()">ทำรายการใหม่</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= หน้าเช็คยอด ================= -->
+    <div id="checkTab" style="display: none;">
+      <div class="form-group">
+        <label>กรอกรหัสประจำตัวเพื่อค้นหาข้อมูล</label>
+        <input type="text" id="searchOrderId" placeholder="เช่น URD1234">
+      </div>
+      <button class="btn-search" onclick="searchData()">ค้นหา</button>
+
+      <div id="searchResults" style="display: none; margin-top: 15px;">
+        <div class="summary-card">
+          <div class="summary-title">ผลการค้นหา</div>
+          <div class="summary-item"><strong>รหัสประจำตัว:</strong> <span id="searchResId"></span></div>
+          <div class="summary-item"><strong>ชื่อเล่น:</strong> <span id="searchResName"></span></div>
+          <div class="summary-item"><strong>รวมยอดส่งแล้ว:</strong> <span id="searchResTotal" style="color:#28a745; font-weight:bold;"></span> บาท</div>
+          
+          <div style="margin-top: 15px; font-weight: bold;">ประวัติการส่งยอด:</div>
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>ยอดที่โอน</th>
+                <th>สลิป</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyP1UeHBTCYdZJp6R07Gt94s70-_Iu-4uIl9ahPvyDHrABW2NPD-f7P2w6xjC57bialBw/exec";
+
+    function switchTab(tabId) {
+      document.getElementById('sendTab').style.display = tabId === 'sendTab' ? 'block' : 'none';
+      document.getElementById('checkTab').style.display = tabId === 'checkTab' ? 'block' : 'none';
+      
+      const btns = document.querySelectorAll('.tab-btn');
+      btns[0].classList.toggle('active', tabId === 'sendTab');
+      btns[1].classList.toggle('active', tabId === 'checkTab');
+    }
+
+    function submitData() {
+      const orderId = document.getElementById('orderId').value.trim();
+      const nickName = document.getElementById('nickName').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+      const fileInput = document.getElementById('fileInput');
+
+      if (!orderId || !nickName || !amount) {
+        alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+        return;
+      }
+
+      const submitBtn = document.querySelector('.btn-submit');
+      submitBtn.innerText = 'กำลังบันทึกข้อมูล...';
+      submitBtn.disabled = true;
+
+      const file = fileInput.files[0];
+
+      function sendPayload(fileData) {
+        const payload = {
+          orderId: orderId,
+          nickName: nickName,
+          amount: amount,
+          fileData: fileData || null
+        };
+
+        fetch(SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: JSON.stringify(payload)
+        })
+        .then(() => {
+          document.getElementById('sendFormContainer').style.display = 'none';
+          document.getElementById('sendSummaryContainer').style.display = 'block';
+
+          document.getElementById('resOrderId').innerText = orderId;
+          document.getElementById('resNickName').innerText = nickName;
+          document.getElementById('resAmount').innerText = amount;
+        })
+        .catch(error => {
+          alert('เกิดข้อผิดพลาด: ' + error);
+          submitBtn.innerText = 'ยืนยันการส่งยอด';
+          submitBtn.disabled = false;
+        });
+      }
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const content = e.target.result;
+          const fileData = {
+            filename: file.name,
+            mimeType: file.type,
+            bytes: content.split(',')[1]
+          };
+          sendPayload(fileData);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        sendPayload(null);
+      }
+    }
+
+    function resetSendForm() {
+      document.getElementById('submitForm').reset();
+      document.getElementById('sendFormContainer').style.display = 'block';
+      document.getElementById('sendSummaryContainer').style.display = 'none';
+      const submitBtn = document.querySelector('.btn-submit');
+      submitBtn.innerText = 'ยืนยันการส่งยอด';
+      submitBtn.disabled = false;
+    }
+
+    function searchData() {
+      const searchId = document.getElementById('searchOrderId').value.trim();
+      if (!searchId) {
+        alert('กรุณากรอกรหัสประจำตัว');
+        return;
+      }
+
+      const btn = document.querySelector('.btn-search');
+      btn.innerText = 'กำลังค้นหา...';
+      btn.disabled = true;
+
+      fetch(`${SCRIPT_URL}?action=search&orderId=${encodeURIComponent(searchId)}`)
+        .then(res => res.json())
+        .then(data => {
+          btn.innerText = 'ค้นหา';
+          btn.disabled = false;
+
+          if (data.status === "success" && data.found) {
+            document.getElementById('searchResId').innerText = data.orderId;
+            document.getElementById('searchResName').innerText = data.nickName || "-";
+            document.getElementById('searchResTotal').innerText = data.totalAmount.toLocaleString();
+
+            const tbody = document.getElementById('historyBody');
+            tbody.innerHTML = "";
+            
+            data.history.forEach(item => {
+              const tr = document.createElement('tr');
+              const slipHtml = item.slipUrl && item.slipUrl !== "ไม่มีการแนบไฟล์" 
+                ? `<a href="${item.slipUrl}" target="_blank">ดูสลิป</a>` 
+                : "-";
+              
+              tr.innerHTML = `
+                <td>${item.date}</td>
+                <td>${item.amount.toLocaleString()}</td>
+                <td>${slipHtml}</td>
+              `;
+              tbody.appendChild(tr);
+            });
+
+            document.getElementById('searchResults').style.display = 'block';
+          } else {
+            alert('ไม่พบข้อมูลสำหรับรหัสประจำตัวนี้');
+            document.getElementById('searchResults').style.display = 'none';
+          }
+        })
+        .catch(err => {
+          btn.innerText = 'ค้นหา';
+          btn.disabled = false;
+          alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        });
+    }
+  </script>
+</body>
+</html>
