@@ -35,7 +35,7 @@
     .summary-card { background-color: #e9ecef; padding: 20px; border-radius: 8px; color: #333; margin-top: 15px; }
     .summary-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; color: #111; text-align: center; }
     .summary-item { margin-bottom: 10px; font-size: 15px; }
-    .summary-item strong { display: inline-block; width: 120px; }
+    .summary-item strong { display: inline-block; width: 130px; }
     .status-text { color: #28a745; font-weight: bold; margin-top: 15px; text-align: center; }
     
     /* ตารางประวัติ */
@@ -73,7 +73,7 @@
 
         <form id="submitForm">
           <div class="form-group">
-            <label>รหัสประจำตัว (เช่น URD1234)</label>
+            <label>รหัสประจำตัว (เช่น URD1234 หรือ ORD1234)</label>
             <input type="text" id="orderId" placeholder="กรอกรหัสประจำตัวของคุณ" required>
           </div>
 
@@ -122,7 +122,10 @@
           <div class="summary-title">ผลการค้นหา</div>
           <div class="summary-item"><strong>รหัสประจำตัว:</strong> <span id="searchResId"></span></div>
           <div class="summary-item"><strong>ชื่อเล่น:</strong> <span id="searchResName"></span></div>
+          <div class="summary-item"><strong>สินค้าที่ผ่อน:</strong> <span id="searchResProduct" style="color:#0056b3; font-weight:bold;"></span></div>
+          <div class="summary-item"><strong>ราคาสินค้ารวม:</strong> <span id="searchResTotalPrice"></span> บาท</div>
           <div class="summary-item"><strong>รวมยอดส่งแล้ว:</strong> <span id="searchResTotal" style="color:#28a745; font-weight:bold;"></span> บาท</div>
+          <div class="summary-item"><strong>ยอดคงเหลือ:</strong> <span id="searchResRemaining" style="color:#dc3545; font-weight:bold;"></span> บาท</div>
           
           <div style="margin-top: 15px; font-weight: bold;">ประวัติการส่งยอด:</div>
           <table class="history-table">
@@ -142,7 +145,7 @@
   </div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwCYfK01Uths2PlThRjYYeZm1aqu0PMheFir5LRZUtkEiPlarTBWF8-ah13NKlXN10X_Q/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbypIyMXEXdv2wz5XFhNrzI4MkEg9L-FzK7nqRrobx05oQGGUpnCIuhyjPCRj_KiwuyzSg/exec";
 
     function switchTab(tabId) {
       document.getElementById('sendTab').style.display = tabId === 'sendTab' ? 'block' : 'none';
@@ -224,6 +227,7 @@
       submitBtn.disabled = false;
     }
 
+    // ฟังก์ชันค้นหาแบบ JSONP (ก้าวข้ามข้อจำกัด CORS)
     function searchData() {
       const searchId = document.getElementById('searchOrderId').value.trim();
       if (!searchId) {
@@ -235,45 +239,61 @@
       btn.innerText = 'กำลังค้นหา...';
       btn.disabled = true;
 
-      fetch(`${SCRIPT_URL}?action=search&orderId=${encodeURIComponent(searchId)}`)
-        .then(res => res.json())
-        .then(data => {
-          btn.innerText = 'ค้นหา';
-          btn.disabled = false;
+      const oldScript = document.getElementById('jsonpScript');
+      if (oldScript) oldScript.remove();
 
-          if (data.status === "success" && data.found) {
-            document.getElementById('searchResId').innerText = data.orderId;
-            document.getElementById('searchResName').innerText = data.nickName || "-";
-            document.getElementById('searchResTotal').innerText = data.totalAmount.toLocaleString();
+      const script = document.createElement('script');
+      script.id = 'jsonpScript';
+      script.src = `${SCRIPT_URL}?action=search&orderId=${encodeURIComponent(searchId)}&callback=handleSearchResponse`;
+      
+      script.onerror = function() {
+        btn.innerText = 'ค้นหา';
+        btn.disabled = false;
+        alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      };
 
-            const tbody = document.getElementById('historyBody');
-            tbody.innerHTML = "";
+      document.body.appendChild(script);
+    }
+
+    function handleSearchResponse(data) {
+      const btn = document.querySelector('.btn-search');
+      btn.innerText = 'ค้นหา';
+      btn.disabled = false;
+
+      if (data && data.status === "success" && data.found) {
+        document.getElementById('searchResId').innerText = data.orderId;
+        document.getElementById('searchResName').innerText = data.nickName || "-";
+        document.getElementById('searchResProduct').innerText = data.product || "-";
+        document.getElementById('searchResTotalPrice').innerText = data.totalPrice ? data.totalPrice.toLocaleString() : "0";
+        document.getElementById('searchResTotal').innerText = data.totalAmount ? data.totalAmount.toLocaleString() : "0";
+        document.getElementById('searchResRemaining').innerText = data.remaining ? data.remaining.toLocaleString() : "0";
+
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = "";
+        
+        if (data.history && data.history.length > 0) {
+          data.history.forEach(item => {
+            const tr = document.createElement('tr');
+            const slipHtml = (item.slipUrl && item.slipUrl !== "ไม่มีการแนบไฟล์" && item.slipUrl.indexOf("http") === 0) 
+              ? `<a href="${item.slipUrl}" target="_blank">ดูสลิป</a>` 
+              : "-";
             
-            data.history.forEach(item => {
-              const tr = document.createElement('tr');
-              const slipHtml = item.slipUrl && item.slipUrl !== "ไม่มีการแนบไฟล์" 
-                ? `<a href="${item.slipUrl}" target="_blank">ดูสลิป</a>` 
-                : "-";
-              
-              tr.innerHTML = `
-                <td>${item.date}</td>
-                <td>${item.amount.toLocaleString()}</td>
-                <td>${slipHtml}</td>
-              `;
-              tbody.appendChild(tr);
-            });
+            tr.innerHTML = `
+              <td>${item.date}</td>
+              <td>${item.amount.toLocaleString()}</td>
+              <td>${slipHtml}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;">ยังไม่มีประวัติการส่งยอด</td></tr>`;
+        }
 
-            document.getElementById('searchResults').style.display = 'block';
-          } else {
-            alert('ไม่พบข้อมูลสำหรับรหัสประจำตัวนี้');
-            document.getElementById('searchResults').style.display = 'none';
-          }
-        })
-        .catch(err => {
-          btn.innerText = 'ค้นหา';
-          btn.disabled = false;
-          alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-        });
+        document.getElementById('searchResults').style.display = 'block';
+      } else {
+        alert(data.message || 'ไม่พบข้อมูลสำหรับรหัสประจำตัวนี้');
+        document.getElementById('searchResults').style.display = 'none';
+      }
     }
   </script>
 </body>
